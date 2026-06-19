@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>LLMWiki</title>
+  </head>
+  <body style="font-family:system-ui,-apple-system,sans-serif;max-width:420px;margin:0 auto;padding:40px 22px;text-align:center;color:#111">
+    <h1 style="font-size:24px;margin-bottom:6px">LLMWiki</h1>
+    <p id="msg" style="color:#555">앱을 여는 중…</p>
+    <p>
+      <a id="apk" href="https://github.com/mynameisjinhohong/llmwiki-app/releases/latest/download/llmwiki.apk"
+         style="display:none;background:#2563eb;color:#fff;padding:14px 24px;border-radius:10px;text-decoration:none;font-weight:600">앱 설치 (APK)</a>
+    </p>
+    <p>
+      <button id="pairbtn" onclick="openApp()"
+        style="display:none;background:#e5e7eb;border:0;padding:12px 18px;border-radius:10px;font-size:15px;cursor:pointer">앱에서 열기 / 연동</button>
+    </p>
+    <p style="color:#9ca3af;font-size:12px;margin-top:28px">Android · 첫 설치 시 "출처를 알 수 없는 앱" 허용 필요</p>
+    <script>
+      // Pairing data rides in the URL #fragment (not sent to the server). Fall back to ?d=.
+      var d = (location.hash.match(/[#&]d=([^&]+)/) || [])[1] || new URLSearchParams(location.search).get('d');
+      function openApp() { if (d) location.href = 'llmwiki://pair?d=' + d; }
+      var left = false;
+      document.addEventListener('visibilitychange', function () { if (document.hidden) left = true; });
+      if (d) openApp(); // if the app is installed it takes over here
+      setTimeout(function () {
+        if (!left) {
+          document.getElementById('msg').textContent = d
+            ? '앱이 안 열렸나요? 설치하거나(아래), 이미 설치돼 있으면 "앱에서 열기"를 누르세요.'
+            : '앱을 설치하세요.';
+          document.getElementById('apk').style.display = 'inline-block';
+          if (d) document.getElementById('pairbtn').style.display = 'inline-block';
+        }
+      }, 1500);
+    </script>
+  </body>
+</html>
