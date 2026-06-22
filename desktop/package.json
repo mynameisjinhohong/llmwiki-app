@@ -1,0 +1,40 @@
+{
+  "name": "llmwiki-desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Windows build context for the LLMWiki desktop app (built in CI; see .github/workflows/desktop-windows.yml).",
+  "main": "main.js",
+  "scripts": {
+    "dist": "electron-builder --win"
+  },
+  "devDependencies": {
+    "electron": "^42.4.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.llmwiki.desktop",
+    "productName": "LLMWiki",
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "package.json"
+    ],
+    "extraResources": [
+      { "from": "dist", "to": "dist" },
+      { "from": "agent.mjs", "to": "agent/agent.mjs" }
+    ],
+    "win": {
+      "target": "nsis"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "artifactName": "LLMWiki-Setup.${ext}"
+    }
+  }
+}

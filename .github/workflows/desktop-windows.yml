@@ -1,0 +1,46 @@
+name: Build Windows desktop app
+
+# Run manually from the Actions tab (or `gh workflow run desktop-windows.yml`),
+# or by pushing a tag like `desktop-v0.1.0`. Builds the unsigned Windows installer
+# on a Windows runner and publishes it to a rolling `desktop-latest` release.
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'desktop-v*'
+
+permissions:
+  contents: write # create/update releases in this repo
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        working-directory: desktop
+        run: npm install
+
+      - name: Build Windows installer (NSIS, unsigned)
+        working-directory: desktop
+        run: npm run dist
+
+      - name: Remove previous rolling release
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release delete desktop-latest --cleanup-tag --yes
+
+      - name: Publish installer to desktop-latest
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >
+          gh release create desktop-latest "desktop/release/LLMWiki-Setup.exe"
+          --title "LLMWiki Desktop (Windows)"
+          --notes "Unsigned Windows installer for the LLMWiki desktop app. See INSTALL-desktop.md for setup. SmartScreen will warn (unsigned) — choose More info -> Run anyway."
+          --latest=false
