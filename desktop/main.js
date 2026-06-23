@@ -84,6 +84,7 @@ ipcMain.handle('agent:getConfig', () => {
     repoPath: c.repoPath ?? '',
     branch: c.branch ?? 'main',
     runners: ['claude', 'gemini', 'codex'],
+    ingestHost: c.ingestHost !== false, // default on; off → this desktop won't auto-ingest
   };
 });
 
@@ -308,6 +309,7 @@ let pollerTimer = null;
 async function pollTick() {
   if (agentRunning) return; // serialize with manual runs
   const cfg = readAgentConfig();
+  if (cfg.ingestHost === false) return; // this desktop opted out of being the ingest host
   const repo = cfg.repoPath;
   const branch = cfg.branch || 'main';
   if (!repo) return;
