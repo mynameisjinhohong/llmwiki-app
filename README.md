@@ -1,3 +1,5 @@
+**English** | [한국어](README.ko.md)
+
 # llmwiki-app
 
 Public distribution for **LLMWiki** — install the apps without an app store.
