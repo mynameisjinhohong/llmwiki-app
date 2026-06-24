@@ -3,7 +3,7 @@
 // STABLE origin (so localStorage / saved config persists across launches) with no
 // open network port. Same UI as the mobile app.
 
-const { app, BrowserWindow, protocol, shell, ipcMain, globalShortcut } = require('electron');
+const { app, BrowserWindow, protocol, shell, ipcMain, globalShortcut, dialog } = require('electron');
 const { spawn, execFile } = require('node:child_process');
 const http = require('node:http');
 const os = require('node:os');
@@ -295,6 +295,48 @@ ipcMain.handle('autolaunch:set', (_e, enabled) => {
     return { ok: true, supported: true, enabled: app.getLoginItemSettings().openAtLogin };
   } catch (e) {
     return { ok: false, supported: true, enabled: false, error: String((e && e.message) || e) };
+  }
+});
+
+// ---- Update check: compare this build's commit SHA (stamped by CI into buildinfo.json)
+// against the latest release's version.json. Different → a newer build is out → prompt.
+const REPO_SLUG = 'mynameisjinhohong/llmwiki-app';
+const BUILD_SHA = (() => {
+  try {
+    return JSON.parse(fs.readFileSync(path.join(__dirname, 'buildinfo.json'), 'utf8')).sha || null;
+  } catch {
+    return null; // dev run / unstamped build → no update check
+  }
+})();
+
+ipcMain.handle('update:check', async (_e, lang) => {
+  if (!BUILD_SHA) return { available: false };
+  try {
+    const res = await fetch(
+      `https://github.com/${REPO_SLUG}/releases/download/desktop-latest/version.json?_cb=${Date.now()}`,
+    );
+    if (!res.ok) return { available: false };
+    const latest = (await res.json()).sha;
+    if (!latest || latest === BUILD_SHA) return { available: false };
+
+    const ko = lang === 'ko';
+    const choice = await dialog.showMessageBox({
+      type: 'info',
+      title: ko ? '업데이트 있음' : 'Update available',
+      message: ko ? 'LLMWiki 새 버전이 있습니다.' : 'A newer version of LLMWiki is available.',
+      detail: ko
+        ? '다운로드 후 설치 파일을 실행하면 업데이트됩니다. 설정은 그대로 유지됩니다.'
+        : 'Download and run the installer to update. Your settings are kept.',
+      buttons: ko ? ['다운로드', '나중에'] : ['Download', 'Later'],
+      defaultId: 0,
+      cancelId: 1,
+    });
+    if (choice.response === 0) {
+      shell.openExternal(`https://github.com/${REPO_SLUG}/releases/download/desktop-latest/LLMWiki-Setup.exe`);
+    }
+    return { available: true, current: BUILD_SHA, latest };
+  } catch {
+    return { available: false };
   }
 });
 

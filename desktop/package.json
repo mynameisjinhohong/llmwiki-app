@@ -21,7 +21,8 @@
     "files": [
       "main.js",
       "preload.js",
-      "package.json"
+      "package.json",
+      "buildinfo.json"
     ],
     "extraResources": [
       { "from": "dist", "to": "dist" },

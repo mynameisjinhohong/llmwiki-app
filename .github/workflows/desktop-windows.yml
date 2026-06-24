@@ -26,6 +26,16 @@ jobs:
         working-directory: desktop
         run: npm install
 
+      # Stamp the build's commit SHA into the app (bundled buildinfo.json) and into a
+      # version.json release asset. The app compares them to detect a newer build.
+      - name: Stamp build id
+        working-directory: desktop
+        shell: pwsh
+        run: |
+          $info = '{"sha":"${{ github.sha }}"}'
+          Set-Content -NoNewline -Path buildinfo.json -Value $info
+          Set-Content -NoNewline -Path version.json -Value $info
+
       - name: Build Windows installer (NSIS, unsigned)
         working-directory: desktop
         run: npm run dist
@@ -40,7 +50,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: >
-          gh release create desktop-latest "desktop/release/LLMWiki-Setup.exe"
+          gh release create desktop-latest "desktop/release/LLMWiki-Setup.exe" "desktop/version.json"
           --title "LLMWiki Desktop (Windows)"
           --notes "Unsigned Windows installer for the LLMWiki desktop app. See INSTALL-desktop.md for setup. SmartScreen will warn (unsigned) — choose More info -> Run anyway."
           --latest=false

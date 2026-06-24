@@ -1,2 +1,5 @@
 node_modules/
 release/
+# CI-generated build stamps
+buildinfo.json
+version.json

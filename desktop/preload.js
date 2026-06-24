@@ -14,4 +14,5 @@ contextBridge.exposeInMainWorld('llmwiki', {
   getPairBaseUrl: () => ipcRenderer.invoke('pair:baseUrl'),
   getAutoLaunch: () => ipcRenderer.invoke('autolaunch:get'),
   setAutoLaunch: (enabled) => ipcRenderer.invoke('autolaunch:set', enabled),
+  checkUpdate: (lang) => ipcRenderer.invoke('update:check', lang),
 });
