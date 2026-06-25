@@ -26,17 +26,13 @@ jobs:
         working-directory: desktop
         run: npm install
 
-      # Stamp the build's commit SHA into the app (bundled buildinfo.json) and into a
-      # version.json release asset. The app compares them to detect a newer build.
-      - name: Stamp build id
+      # Give each build a monotonically increasing version so electron-updater can tell
+      # an installed app it is out of date (the run number always grows).
+      - name: Set build version
         working-directory: desktop
-        shell: pwsh
-        run: |
-          $info = '{"sha":"${{ github.sha }}"}'
-          Set-Content -NoNewline -Path buildinfo.json -Value $info
-          Set-Content -NoNewline -Path version.json -Value $info
+        run: npm version "0.1.${{ github.run_number }}" --no-git-tag-version --allow-same-version
 
-      - name: Build Windows installer (NSIS, unsigned)
+      - name: Build Windows installer (NSIS, unsigned) + update metadata
         working-directory: desktop
         run: npm run dist
 
@@ -46,11 +42,16 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: gh release delete desktop-latest --cleanup-tag --yes
 
+      # Upload the installer + electron-updater metadata (latest.yml + blockmap) so the
+      # in-app auto-updater can detect, download, and install new versions.
       - name: Publish installer to desktop-latest
         env:
           GH_TOKEN: ${{ github.token }}
         run: >
-          gh release create desktop-latest "desktop/release/LLMWiki-Setup.exe" "desktop/version.json"
+          gh release create desktop-latest
+          "desktop/release/LLMWiki-Setup.exe"
+          "desktop/release/LLMWiki-Setup.exe.blockmap"
+          "desktop/release/latest.yml"
           --title "LLMWiki Desktop (Windows)"
-          --notes "Unsigned Windows installer for the LLMWiki desktop app. See INSTALL-desktop.md for setup. SmartScreen will warn (unsigned) — choose More info -> Run anyway."
+          --notes "Unsigned Windows installer for the LLMWiki desktop app. Auto-updates in-app. See INSTALL-desktop.md. SmartScreen may warn (unsigned) — choose More info -> Run anyway."
           --latest=false

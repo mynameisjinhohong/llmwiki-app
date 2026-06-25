@@ -7,6 +7,9 @@
   "scripts": {
     "dist": "electron-builder --win"
   },
+  "dependencies": {
+    "electron-updater": "^6.3.9"
+  },
   "devDependencies": {
     "electron": "^42.4.0",
     "electron-builder": "^25.1.8"
@@ -18,11 +21,16 @@
       "output": "release",
       "buildResources": "build"
     },
+    "publish": [
+      {
+        "provider": "generic",
+        "url": "https://github.com/mynameisjinhohong/llmwiki-app/releases/download/desktop-latest/"
+      }
+    ],
     "files": [
       "main.js",
       "preload.js",
-      "package.json",
-      "buildinfo.json"
+      "package.json"
     ],
     "extraResources": [
       { "from": "dist", "to": "dist" },

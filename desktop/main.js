@@ -298,45 +298,64 @@ ipcMain.handle('autolaunch:set', (_e, enabled) => {
   }
 });
 
-// ---- Update check: compare this build's commit SHA (stamped by CI into buildinfo.json)
-// against the latest release's version.json. Different → a newer build is out → prompt.
-const REPO_SLUG = 'mynameisjinhohong/llmwiki-app';
-const BUILD_SHA = (() => {
-  try {
-    return JSON.parse(fs.readFileSync(path.join(__dirname, 'buildinfo.json'), 'utf8')).sha || null;
-  } catch {
-    return null; // dev run / unstamped build → no update check
-  }
-})();
+// ---- Auto-update via electron-updater (Windows). The build's `publish` config bundles
+// an app-update.yml pointing at the desktop-latest release; clicking "Update" downloads
+// the new installer in the background and silently installs + relaunches the app.
+let autoUpdater = null;
+try {
+  autoUpdater = require('electron-updater').autoUpdater;
+} catch {
+  // module not bundled (e.g. older build) → update feature simply disabled, no crash
+}
+
+function progressWin() {
+  return BrowserWindow.getAllWindows().find((w) => !w.isDestroyed());
+}
+
+if (autoUpdater) {
+  autoUpdater.autoDownload = false; // ask the user first
+  autoUpdater.autoInstallOnAppQuit = false;
+  autoUpdater.on('download-progress', (p) => {
+    try {
+      progressWin()?.setProgressBar(Math.max(0, Math.min(1, (p.percent || 0) / 100)));
+    } catch {}
+  });
+  autoUpdater.on('update-downloaded', () => {
+    try {
+      progressWin()?.setProgressBar(-1);
+    } catch {}
+    autoUpdater.quitAndInstall(true, true); // silent install + relaunch
+  });
+  autoUpdater.on('error', () => {
+    try {
+      progressWin()?.setProgressBar(-1);
+    } catch {}
+  });
+}
 
 ipcMain.handle('update:check', async (_e, lang) => {
-  if (!BUILD_SHA) return { available: false };
+  if (!autoUpdater || process.platform !== 'win32' || !app.isPackaged) return { available: false };
+  const ko = lang === 'ko';
   try {
-    const res = await fetch(
-      `https://github.com/${REPO_SLUG}/releases/download/desktop-latest/version.json?_cb=${Date.now()}`,
-    );
-    if (!res.ok) return { available: false };
-    const latest = (await res.json()).sha;
-    if (!latest || latest === BUILD_SHA) return { available: false };
-
-    const ko = lang === 'ko';
+    const r = await autoUpdater.checkForUpdates();
+    if (!r?.isUpdateAvailable) return { available: false };
     const choice = await dialog.showMessageBox({
       type: 'info',
       title: ko ? '업데이트 있음' : 'Update available',
-      message: ko ? 'LLMWiki 새 버전이 있습니다.' : 'A newer version of LLMWiki is available.',
+      message: ko
+        ? `LLMWiki 새 버전(${r.updateInfo.version})이 있습니다.`
+        : `LLMWiki ${r.updateInfo.version} is available.`,
       detail: ko
-        ? '다운로드 후 설치 파일을 실행하면 업데이트됩니다. 설정은 그대로 유지됩니다.'
-        : 'Download and run the installer to update. Your settings are kept.',
-      buttons: ko ? ['다운로드', '나중에'] : ['Download', 'Later'],
+        ? '지금 다운로드해 자동으로 업데이트할까요? 다운로드가 끝나면 앱이 재시작됩니다. 설정은 유지됩니다.'
+        : 'Download and install now? The app restarts when it finishes. Your settings are kept.',
+      buttons: ko ? ['업데이트', '나중에'] : ['Update', 'Later'],
       defaultId: 0,
       cancelId: 1,
     });
-    if (choice.response === 0) {
-      shell.openExternal(`https://github.com/${REPO_SLUG}/releases/download/desktop-latest/LLMWiki-Setup.exe`);
-    }
-    return { available: true, current: BUILD_SHA, latest };
-  } catch {
-    return { available: false };
+    if (choice.response === 0) autoUpdater.downloadUpdate(); // → 'update-downloaded' → quitAndInstall
+    return { available: true };
+  } catch (e) {
+    return { available: false, error: String((e && e.message) || e) };
   }
 });
 
