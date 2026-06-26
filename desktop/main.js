@@ -337,17 +337,22 @@ if (autoUpdater) {
 }
 
 ipcMain.handle('update:check', async (_e, lang) => {
-  if (!autoUpdater || process.platform !== 'win32' || !app.isPackaged) return { available: false };
+  let current = '';
+  try {
+    current = app.getVersion();
+  } catch {}
+  if (!autoUpdater) return { status: 'unavailable', current };
+  if (process.platform !== 'win32') return { status: 'unsupported', current };
+  if (!app.isPackaged) return { status: 'dev', current };
   const ko = lang === 'ko';
   try {
     const r = await autoUpdater.checkForUpdates();
-    if (!r?.isUpdateAvailable) return { available: false };
+    const latest = (r && r.updateInfo && r.updateInfo.version) || current;
+    if (!r || !r.isUpdateAvailable) return { status: 'uptodate', current, latest };
     const choice = await dialog.showMessageBox({
       type: 'info',
       title: ko ? '업데이트 있음' : 'Update available',
-      message: ko
-        ? `LLMWiki 새 버전(${r.updateInfo.version})이 있습니다.`
-        : `LLMWiki ${r.updateInfo.version} is available.`,
+      message: ko ? `LLMWiki 새 버전(${latest})이 있습니다.` : `LLMWiki ${latest} is available.`,
       detail: ko
         ? '지금 다운로드해 자동으로 업데이트할까요? 다운로드가 끝나면 앱이 재시작됩니다. 설정은 유지됩니다.'
         : 'Download and install now? The app restarts when it finishes. Your settings are kept.',
@@ -356,9 +361,9 @@ ipcMain.handle('update:check', async (_e, lang) => {
       cancelId: 1,
     });
     if (choice.response === 0) autoUpdater.downloadUpdate(); // → 'update-downloaded' → quitAndInstall
-    return { available: true };
+    return { status: 'available', current, latest };
   } catch (e) {
-    return { available: false, error: String((e && e.message) || e) };
+    return { status: 'error', current, error: String((e && e.message) || e) };
   }
 });
 
