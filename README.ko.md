@@ -4,6 +4,8 @@
 
 앱 스토어 없이 **LLMWiki** 앱을 설치·배포하기 위한 공개 저장소입니다.
 
+> 🚀 **처음 사용하시나요? → [셋업 가이드 (GitHub 연동 · 토큰 발급)](SETUP.ko.md)** 부터 보세요. 앱 설치 후 GitHub 연결이 막히면 여기에 단계별로 다 있습니다.
+
 ## 📱 안드로이드 앱
 
 - **설치 / 연동 페이지** (GitHub Pages): https://mynameisjinhohong.github.io/llmwiki-app/
