@@ -278,6 +278,9 @@ ipcMain.handle('pair:baseUrl', () => {
   return ip ? `http://${ip}:${PAIR_PORT}` : null;
 });
 
+// ---- App version (shown in Settings so the user can see what build they're on) ----
+ipcMain.handle('app:version', () => app.getVersion());
+
 // ---- Launch at login (auto-start on boot) — macOS/Windows via the OS login items ----
 ipcMain.handle('autolaunch:get', () => {
   try {
