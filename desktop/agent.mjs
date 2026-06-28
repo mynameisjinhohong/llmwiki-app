@@ -70,6 +70,10 @@ const LANG_LINE = `Write your final summary/report to the user in ${LANG_NAMES[R
 const INGEST_PROMPT = [
   'Process my inbox and ingest it into the wiki, following docs/wiki-schema.md EXACTLY (read it first).',
   '- Turn each top-level item in inbox/ (*.md) into well-synthesized, interlinked wiki pages under wiki/.',
+  // Multi-host: on a shared wiki, each member's host ingests only its OWN captures.
+  cfg.author
+    ? `- AUTHOR FILTER: only process inbox/*.md whose YAML frontmatter \`author:\` equals "${cfg.author}" (or has no author). Do NOT read, move, edit, or archive items by other authors — leave them untouched in inbox/.`
+    : null,
   '- Image captures: an inbox note with an ![](media/...) reference points to a binary in inbox/media/.',
   '  Move that binary to sources/media/, OCR/caption it, and embed it in the relevant page.',
   '- Update wiki/index.md and append a dated block to wiki/log.md.',
@@ -78,7 +82,9 @@ const INGEST_PROMPT = [
   '- IMPORTANT: do NOT run git (no add/commit/push) — the wrapper handles git.',
   'Finish with a one-paragraph summary of pages created/updated and any redactions.',
   LANG_LINE,
-].join('\n');
+]
+  .filter(Boolean)
+  .join('\n');
 
 const LINT_PROMPT = [
   'Lint my wiki, following docs/wiki-schema.md §6 (read it first).',
@@ -163,9 +169,22 @@ async function applyOp(kind) {
   const commit = await git(['commit', '-m', `${kind} (agent/${cfg.runner}): ${stamp}`]);
   let pushed = false;
   if (cfg.git.push && commit.ok) {
-    const p = await git(['push', 'origin', cfg.branch]);
-    pushed = p.ok;
-    if (!p.ok) console.error('  push failed:', p.stderr);
+    // Concurrent multi-host pushes: on a non-fast-forward, rebase onto the other host's
+    // work and retry. log.md is append-only and pages rarely overlap, so rebase usually
+    // auto-merges; a genuine content conflict aborts and is left for the next run.
+    for (let attempt = 0; attempt < 3 && !pushed; attempt++) {
+      const p = await git(['push', 'origin', cfg.branch]);
+      if (p.ok) {
+        pushed = true;
+        break;
+      }
+      console.error(`  push failed (attempt ${attempt + 1}):`, p.stderr);
+      const rb = await git(['pull', '--rebase', 'origin', cfg.branch]);
+      if (!rb.ok) {
+        console.error('  rebase failed:', rb.stderr);
+        break;
+      }
+    }
   }
   console.log(`  committed=${commit.ok} pushed=${pushed}`);
   return { ok: commit.ok, changed: status.stdout.split('\n').filter(Boolean).length, pushed, summary: cli.output };

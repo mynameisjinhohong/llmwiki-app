@@ -4,7 +4,7 @@
 // open network port. Same UI as the mobile app.
 
 const { app, BrowserWindow, protocol, shell, ipcMain, globalShortcut, dialog } = require('electron');
-const { spawn, execFile } = require('node:child_process');
+const { spawn, execFile, execFileSync } = require('node:child_process');
 const http = require('node:http');
 const os = require('node:os');
 const fs = require('node:fs');
@@ -191,6 +191,59 @@ ipcMain.handle('share:fetch', async (_e, url) => {
     return { ok: false, error: String((e && e.message) || e) };
   } finally {
     if (!w.isDestroyed()) w.destroy();
+  }
+});
+
+// OAuth device flow proxy — github.com's OAuth endpoints send no CORS headers, so the
+// renderer can't call them directly; the main process (Node, no CORS) does the POST.
+ipcMain.handle('oauth:fetch', async (_e, url, body) => {
+  if (!/^https:\/\/github\.com\/login\//.test(url || '')) return { error: 'blocked_url' };
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded', Accept: 'application/json' },
+      body: new URLSearchParams(body || {}).toString(),
+    });
+    return await res.json();
+  } catch (e) {
+    return { error: 'network_error', error_description: String((e && e.message) || e) };
+  }
+});
+
+// Clone a wiki repo to a local path for the desktop CLI-runner ingest. The token is embedded
+// in the remote so the agent can pull/push later without re-supplying it (token stays on the
+// user's own disk, same trust level as the saved credential). Reuses an existing clone.
+function remoteMatches(dir, owner, repo) {
+  try {
+    const out = execFileSync('git', ['-C', dir, 'remote', 'get-url', 'origin'], { encoding: 'utf8' });
+    return new RegExp(`[:/]${owner}/${repo}(\\.git)?/?$`, 'i').test(out.trim());
+  } catch {
+    return false;
+  }
+}
+
+// Ensure a local clone exists for this wiki and return its path. Reuses a matching clone
+// (the `adopt` candidate, or the default dir) instead of cloning again — so switching wikis
+// can auto-clone without ever duplicating, and the first switch adopts an existing clone.
+ipcMain.handle('wiki:clone', async (_e, arg) => {
+  const { owner, repo, token, adopt } = arg || {};
+  if (!owner || !repo || !token) return { ok: false, error: 'missing owner/repo/token' };
+  const def = path.join(os.homedir(), 'LLMWiki', `${owner}-${repo}`);
+  try {
+    if (adopt && fs.existsSync(path.join(adopt, '.git')) && remoteMatches(adopt, owner, repo))
+      return { ok: true, path: adopt };
+    if (fs.existsSync(path.join(def, '.git')) && remoteMatches(def, owner, repo))
+      return { ok: true, path: def };
+    fs.mkdirSync(path.dirname(def), { recursive: true });
+    const url = `https://x-access-token:${token}@github.com/${owner}/${repo}.git`;
+    await new Promise((resolve, reject) => {
+      execFile('git', ['clone', url, def], { maxBuffer: 16 * 1024 * 1024 }, (err, _so, se) =>
+        err ? reject(new Error(se || err.message)) : resolve(null),
+      );
+    });
+    return { ok: true, path: def };
+  } catch (e) {
+    return { ok: false, error: String((e && e.message) || e).split(token).join('***') };
   }
 });
 
