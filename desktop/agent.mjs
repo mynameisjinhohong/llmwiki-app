@@ -120,11 +120,30 @@ function git(args) {
 function runCli(runnerName, prompt) {
   const r = cfg.runners[runnerName];
   if (!r) return Promise.resolve({ ok: false, output: `unknown runner: ${runnerName}` });
-  const args = r.args.map((a) => a.replace('{PROMPT}', prompt));
+  // Windows: the runner is usually a `.cmd` shim that Node can only launch via shell:true —
+  // which would mangle the multi-line prompt passed as an arg. So on Windows we drop the
+  // {PROMPT} arg and feed the prompt through stdin instead. macOS/Linux keep the arg path.
+  const win = process.platform === 'win32';
+  const args = win
+    ? r.args.filter((a) => a !== '{PROMPT}')
+    : r.args.map((a) => a.replace('{PROMPT}', prompt));
   return new Promise((resolve) => {
     let out = '';
     let errOut = '';
-    const child = spawn(r.cmd, args, { cwd: cfg.repoPath, env: process.env, stdio: ['ignore', 'pipe', 'pipe'] });
+    const child = spawn(r.cmd, args, {
+      cwd: cfg.repoPath,
+      env: process.env,
+      shell: win,
+      stdio: [win ? 'pipe' : 'ignore', 'pipe', 'pipe'],
+    });
+    if (win && child.stdin) {
+      try {
+        child.stdin.write(prompt);
+        child.stdin.end();
+      } catch {
+        /* ignore */
+      }
+    }
     child.stdout.on('data', (d) => (out += d));
     child.stderr.on('data', (d) => (errOut += d));
     child.on('error', (e) =>
