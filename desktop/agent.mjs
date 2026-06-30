@@ -127,7 +127,15 @@ function runCli(runnerName, prompt) {
     const child = spawn(r.cmd, args, { cwd: cfg.repoPath, env: process.env, stdio: ['ignore', 'pipe', 'pipe'] });
     child.stdout.on('data', (d) => (out += d));
     child.stderr.on('data', (d) => (errOut += d));
-    child.on('error', (e) => resolve({ ok: false, output: `spawn error: ${e.message}` }));
+    child.on('error', (e) =>
+      resolve({
+        ok: false,
+        output:
+          e.code === 'ENOENT'
+            ? `'${r.cmd}' not found on PATH. Install it (e.g. Claude Code) and restart, or use "API ingest" in the app (needs an LLM key — no CLI required).`
+            : `spawn error: ${e.message}`,
+      }),
+    );
     child.on('close', (code) => resolve({ ok: code === 0, output: out.trim() || errOut.trim(), code }));
   });
 }
