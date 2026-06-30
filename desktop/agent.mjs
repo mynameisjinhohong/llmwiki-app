@@ -12,7 +12,7 @@
 // Node built-ins only. The desktop app spawns this with Electron's bundled node.
 
 import { execFile, spawn } from 'node:child_process';
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync, readdirSync, renameSync, mkdirSync, rmSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
@@ -70,10 +70,8 @@ const LANG_LINE = `Write your final summary/report to the user in ${LANG_NAMES[R
 const INGEST_PROMPT = [
   'Process my inbox and ingest it into the wiki, following docs/wiki-schema.md EXACTLY (read it first).',
   '- Turn each top-level item in inbox/ (*.md) into well-synthesized, interlinked wiki pages under wiki/.',
-  // Multi-host: on a shared wiki, each member's host ingests only its OWN captures.
-  cfg.author
-    ? `- AUTHOR FILTER: only process inbox/*.md whose YAML frontmatter \`author:\` equals "${cfg.author}" (or has no author). Do NOT read, move, edit, or archive items by other authors — leave them untouched in inbox/.`
-    : null,
+  // (Multi-host author filtering happens in the wrapper BEFORE the CLI runs — other authors'
+  //  captures are moved out of inbox/ so the runner never reads them. No LLM-side filter needed.)
   '- Image captures: an inbox note with an ![](media/...) reference points to a binary in inbox/media/.',
   '  Move that binary to sources/media/, OCR/caption it, and embed it in the relevant page.',
   '- Update wiki/index.md and append a dated block to wiki/log.md.',
@@ -174,15 +172,94 @@ async function triggerPresent() {
   return false;
 }
 
+/** Read `author:` from a capture's leading YAML frontmatter, if any. */
+function parseAuthor(content) {
+  if (!content.startsWith('---')) return null;
+  const end = content.indexOf('\n---', 3);
+  if (end < 0) return null;
+  const m = content.slice(3, end).match(/(?:^|\n)author:\s*([^\n]+)/);
+  return m ? m[1].trim() : null;
+}
+
+// Multi-host author filtering — done in CODE, before the CLI runs, so the runner (and the LLM)
+// never even reads other members' captures (no wasted tokens). Foreign captures are moved to a
+// stash dir and restored verbatim afterwards (before git add), so they stay in inbox/ for their
+// own host. Untagged captures and our own are left in place.
+const STASH_DIR = join(cfg.repoPath, '.llmwiki-stash');
+function stashForeignInbox() {
+  if (!cfg.author) return null; // no identity → process everything (solo)
+  let names;
+  try {
+    names = readdirSync(join(cfg.repoPath, 'inbox'));
+  } catch {
+    return null;
+  }
+  const moved = [];
+  for (const name of names) {
+    if (!/\.md$/.test(name)) continue; // top-level captures only (skip archive/, media/)
+    const src = join(cfg.repoPath, 'inbox', name);
+    let content;
+    try {
+      content = readFileSync(src, 'utf8');
+    } catch {
+      continue;
+    }
+    const a = parseAuthor(content);
+    if (a && a !== cfg.author) {
+      if (!moved.length) mkdirSync(STASH_DIR, { recursive: true });
+      try {
+        renameSync(src, join(STASH_DIR, name));
+        moved.push(name);
+      } catch {
+        /* leave in place if the move fails */
+      }
+    }
+  }
+  return moved.length ? moved : null;
+}
+function restoreForeignInbox(moved) {
+  if (!moved) return;
+  for (const name of moved) {
+    try {
+      renameSync(join(STASH_DIR, name), join(cfg.repoPath, 'inbox', name));
+    } catch {
+      /* ignore */
+    }
+  }
+  try {
+    rmSync(STASH_DIR, { recursive: true, force: true });
+  } catch {
+    /* ignore */
+  }
+}
+// Recover any stash a previous crash left behind, so captures are never stuck out of inbox/.
+function recoverStash() {
+  let names;
+  try {
+    names = readdirSync(STASH_DIR).filter((n) => /\.md$/.test(n));
+  } catch {
+    return;
+  }
+  restoreForeignInbox(names);
+}
+
 /** kind: 'ingest' | 'lint'. Pull → run CLI → (ingest: clear trigger) → commit/push. */
 async function applyOp(kind) {
+  recoverStash();
   const pull = await git(['pull', '--rebase', 'origin', cfg.branch]);
   if (!pull.ok) {
     console.error('  pull failed:', pull.stderr);
     return { ok: false, error: 'pull failed: ' + pull.stderr };
   }
+  // Pre-filter foreign authors' captures out of inbox/ before the CLI reads it.
+  const stashed = kind === 'ingest' ? stashForeignInbox() : null;
   console.log(`  running ${cfg.runner} (${kind})…`);
-  const cli = await runCli(cfg.runner, kind === 'lint' ? LINT_PROMPT : INGEST_PROMPT);
+  let cli;
+  try {
+    cli = await runCli(cfg.runner, kind === 'lint' ? LINT_PROMPT : INGEST_PROMPT);
+  } finally {
+    restoreForeignInbox(stashed); // back to inbox/ before git add → not part of this commit
+  }
   console.log(`  cli(${cfg.runner}): ${cli.ok ? 'ok' : 'exit ' + cli.code}`);
   if (kind === 'ingest' && existsSync(join(cfg.repoPath, cfg.triggerPath))) {
     await git(['rm', '-f', '--', cfg.triggerPath]);
