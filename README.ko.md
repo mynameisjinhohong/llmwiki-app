@@ -16,12 +16,13 @@
 안드로이드 전용입니다(iOS는 사이드로드 불가). 연동 QR에는 GitHub 토큰이 `#fragment`에 담겨 있으니
 **비밀로 취급**하세요 — 공유·스크린샷 금지.
 
-## 🖥 데스크톱 앱 (Windows)
+## 🖥 데스크톱 앱 (Windows · macOS)
 
-- **설치 파일**: https://github.com/mynameisjinhohong/llmwiki-app/releases/download/desktop-latest/LLMWiki-Setup.exe
+- **Windows**: [LLMWiki-Setup.exe](https://github.com/mynameisjinhohong/llmwiki-app/releases/download/desktop-latest/LLMWiki-Setup.exe)
+- **macOS**: [LLMWiki.dmg](https://github.com/mynameisjinhohong/llmwiki-app/releases/download/desktop-latest/LLMWiki.dmg) (universal — Intel·Apple Silicon)
 - **설치 + 설정 방법**: [INSTALL-desktop.md](INSTALL-desktop.md) 참고
 
-현재 **Windows만** 지원합니다(macOS는 Apple 코드 서명 작업 후 제공 예정). 서명이 없어 첫 실행 시
-Windows SmartScreen 경고가 뜹니다 — **추가 정보 → 실행**을 선택하세요. Windows 설치 파일은
-[`desktop/`](desktop/)의 자체 완결형 빌드 컨텍스트로부터 CI
-([.github/workflows/desktop-windows.yml](.github/workflows/desktop-windows.yml))에서 빌드됩니다.
+**코드 서명 없이 무료 배포**라 첫 실행 시 OS 경고가 한 번 뜹니다 — Windows는 **추가 정보 → 실행**,
+macOS는 **우클릭 → 열기**로 우회하면 됩니다(정상). 둘 다 [`desktop/`](desktop/)의 빌드 컨텍스트로부터
+CI ([.github/workflows/desktop-windows.yml](.github/workflows/desktop-windows.yml))에서 빌드됩니다.
+Windows는 인앱 자동 업데이트, macOS는 새 버전 재다운로드.

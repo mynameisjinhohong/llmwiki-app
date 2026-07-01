@@ -16,12 +16,13 @@ Public distribution for **LLMWiki** — install the apps without an app store.
 Android only (iOS can't sideload). The pairing QR carries your GitHub token in its `#fragment`, so
 treat the QR as a secret — don't share or screenshot it.
 
-## 🖥 Desktop app (Windows)
+## 🖥 Desktop app (Windows · macOS)
 
-- **Installer**: https://github.com/mynameisjinhohong/llmwiki-app/releases/download/desktop-latest/LLMWiki-Setup.exe
+- **Windows**: [LLMWiki-Setup.exe](https://github.com/mynameisjinhohong/llmwiki-app/releases/download/desktop-latest/LLMWiki-Setup.exe)
+- **macOS**: [LLMWiki.dmg](https://github.com/mynameisjinhohong/llmwiki-app/releases/download/desktop-latest/LLMWiki.dmg) (universal — Intel + Apple Silicon)
 - **How to install + set up**: see [INSTALL-desktop.md](INSTALL-desktop.md)
 
-Windows only for now (macOS comes once Apple code signing is set up). Unsigned, so Windows
-SmartScreen warns on first run — choose *More info → Run anyway*. The Windows installer is built
-in CI ([.github/workflows/desktop-windows.yml](.github/workflows/desktop-windows.yml)) from the
-self-contained build context in [`desktop/`](desktop/).
+Unsigned (free distribution), so the OS warns once on first run — Windows: *More info → Run anyway*;
+macOS: *right-click → Open*. Both are built in CI
+([.github/workflows/desktop-windows.yml](.github/workflows/desktop-windows.yml)) from the
+self-contained build context in [`desktop/`](desktop/). Windows auto-updates; macOS updates by re-download.

@@ -1,8 +1,10 @@
-name: Build Windows desktop app
+name: Build desktop apps (Windows + macOS)
 
 # Run manually from the Actions tab (or `gh workflow run desktop-windows.yml`),
-# or by pushing a tag like `desktop-v0.1.0`. Builds the unsigned Windows installer
-# on a Windows runner and publishes it to a rolling `desktop-latest` release.
+# or by pushing a tag like `desktop-v0.1.0`. Builds the UNSIGNED Windows installer
+# and the UNSIGNED macOS .dmg, and publishes both to a rolling `desktop-latest` release.
+# Unsigned → users bypass the first-run warning (Windows: More info → Run anyway;
+# macOS: right-click → Open). Windows auto-updates in-app; macOS updates by re-download.
 on:
   workflow_dispatch:
   push:
@@ -52,6 +54,37 @@ jobs:
           "desktop/release/LLMWiki-Setup.exe"
           "desktop/release/LLMWiki-Setup.exe.blockmap"
           "desktop/release/latest.yml"
-          --title "LLMWiki Desktop (Windows)"
-          --notes "Unsigned Windows installer for the LLMWiki desktop app. Auto-updates in-app. See INSTALL-desktop.md. SmartScreen may warn (unsigned) — choose More info -> Run anyway."
+          --title "LLMWiki Desktop (Windows + macOS)"
+          --notes "Unsigned builds. Windows: .exe (auto-updates; SmartScreen may warn — More info -> Run anyway). macOS: LLMWiki.dmg (universal; first run: right-click -> Open to bypass Gatekeeper; update by re-downloading). See INSTALL-desktop.md."
           --latest=false
+
+  macos:
+    needs: windows # the Windows job creates the desktop-latest release; we add the .dmg to it
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        working-directory: desktop
+        run: npm install
+
+      - name: Set build version
+        working-directory: desktop
+        run: npm version "0.1.${{ github.run_number }}" --no-git-tag-version --allow-same-version
+
+      - name: Build macOS .dmg (universal, unsigned)
+        working-directory: desktop
+        run: npx electron-builder --mac
+
+      - name: Upload .dmg to desktop-latest
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >
+          gh release upload desktop-latest
+          desktop/release/LLMWiki.dmg
+          desktop/release/latest-mac.yml
+          --clobber

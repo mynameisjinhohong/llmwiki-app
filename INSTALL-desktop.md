@@ -1,20 +1,27 @@
-# LLMWiki 데스크톱 앱 설치 (Windows)
+# LLMWiki 데스크톱 앱 설치 (Windows · macOS)
 
 LLMWiki 데스크톱 앱은 모바일 앱과 **같은 위키**를 PC에서 둘러보고 · 캡처하고 · 검색하고 · 폰과 연동할 수 있는 데스크톱 버전입니다.
 
-> 현재 **Windows**만 배포합니다. macOS 빌드는 Apple 개발자 서명 작업 후 추후 제공할 예정입니다.
+> **Windows · macOS** 모두 제공합니다. 둘 다 **코드 서명이 없어**(무료 배포) 첫 실행 시 OS 경고가 한 번 뜹니다 — 아래대로 우회하면 됩니다(정상, 악성 아님).
 
 ---
 
 ## 1. 다운로드 & 설치
 
-1. 설치 파일을 받습니다 →
-   **[LLMWiki-Setup.exe 다운로드](https://github.com/mynameisjinhohong/llmwiki-app/releases/download/desktop-latest/LLMWiki-Setup.exe)**
-2. 받은 `LLMWiki-Setup.exe`를 실행합니다.
-3. **Windows SmartScreen 경고**("Windows의 PC 보호" 파란 창)가 뜨면 — 이 앱은 코드 서명이 없어서 그렇습니다(정상). **추가 정보 → 실행**을 누르세요.
-4. 설치 마법사를 진행합니다. (설치 위치 선택 가능, 관리자 권한 불필요 — 내 계정에만 설치)
+### 🪟 Windows
+1. **[LLMWiki-Setup.exe 다운로드](https://github.com/mynameisjinhohong/llmwiki-app/releases/download/desktop-latest/LLMWiki-Setup.exe)**
+2. 받은 `LLMWiki-Setup.exe` 실행
+3. **SmartScreen 경고**("Windows의 PC 보호" 파란 창)가 뜨면 → **추가 정보 → 실행**
+4. 설치 마법사 진행 (관리자 권한 불필요 — 내 계정에만 설치). 이후 **자동 업데이트**됩니다.
 
-설치가 끝나면 시작 메뉴/바탕화면의 **LLMWiki**로 실행합니다.
+### 🍎 macOS
+1. **[LLMWiki.dmg 다운로드](https://github.com/mynameisjinhohong/llmwiki-app/releases/download/desktop-latest/LLMWiki.dmg)** (universal — Intel·Apple Silicon 공용)
+2. `.dmg`를 열고 **LLMWiki** 앱을 **Applications**로 드래그
+3. 첫 실행 시 **"확인되지 않은 개발자" 경고** → Applications에서 **LLMWiki 우클릭 → 열기 → 열기** (한 번만 하면 이후엔 그냥 실행). 서명이 없어서 그렇습니다.
+   - 안 되면 터미널: `xattr -dr com.apple.quarantine /Applications/LLMWiki.app`
+4. macOS는 **자동 업데이트가 없으니**, 새 버전은 위 링크에서 다시 받아 덮어씁니다.
+
+설치 후 **LLMWiki**를 실행합니다.
 
 ## 2. 처음 실행 시 설정
 

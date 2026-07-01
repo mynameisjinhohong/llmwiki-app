@@ -44,6 +44,12 @@
       "perMachine": false,
       "allowToChangeInstallationDirectory": true,
       "artifactName": "LLMWiki-Setup.${ext}"
+    },
+    "mac": {
+      "target": [{ "target": "dmg", "arch": "universal" }],
+      "identity": null,
+      "artifactName": "LLMWiki.${ext}",
+      "category": "public.app-category.productivity"
     }
   }
 }
