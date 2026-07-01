@@ -4,7 +4,7 @@
 
 Public distribution for **LLMWiki** — install the apps without an app store.
 
-> 🚀 **New here? → Start with the [Setup guide (connect GitHub · create a token)](SETUP.md).** If you get stuck connecting GitHub after installing, every step is there.
+> 🚀 **New here? → Start with the [Setup guide (sign in · create a wiki · groups · ingest)](SETUP.md).** It's now **one "Sign in with GitHub"** — no token to create.
 
 ## 📱 Android app
 
