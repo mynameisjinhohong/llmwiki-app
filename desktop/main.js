@@ -158,35 +158,64 @@ const SHARE_UA =
   'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
 
 async function extractRenderedText(wc) {
-  let last = '';
-  for (let i = 0; i < 25; i++) {
-    await new Promise((r) => setTimeout(r, 1000));
+  // Wait out any Cloudflare "just a moment" interstitial + initial hydration.
+  for (let i = 0; i < 12; i++) {
     let t = '';
     try {
       t = await wc.executeJavaScript('(document.body && document.body.innerText) || ""');
     } catch {
       /* page is navigating */
     }
-    if (/just a moment|verifying you are human|enable javascript/i.test(t) && i < 12) {
-      last = t;
-      continue; // possible Cloudflare interstitial — keep waiting
-    }
-    if (t && t.length > 200 && t === last) return t; // content stabilized
-    last = t;
+    if (t && t.length > 200 && !/just a moment|verifying you are human|enable javascript/i.test(t)) break;
+    await new Promise((r) => setTimeout(r, 1000));
   }
-  return last;
+  // Scroll to the bottom so lazily-rendered / virtualized messages actually mount,
+  // repeating until the page height stops growing; keep the longest snapshot seen.
+  // The hidden window otherwise never scrolls, so only messages above the fold get
+  // captured — that's why long conversations came back only partially.
+  const SCROLL_AND_READ = [
+    '(async () => {',
+    '  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));',
+    '  const el = document.scrollingElement || document.documentElement;',
+    "  const read = () => (document.body && document.body.innerText) || '';",
+    '  let best = read();',
+    '  let prevH = -1, same = 0;',
+    '  for (let i = 0; i < 80; i++) {',
+    '    el.scrollTop = el.scrollHeight;',
+    '    await sleep(400);',
+    '    const cur = read();',
+    '    if (cur.length > best.length) best = cur;',
+    '    const h = el.scrollHeight;',
+    '    if (h === prevH) { if (++same >= 3) break; } else { same = 0; prevH = h; }',
+    '  }',
+    '  el.scrollTop = 0;',
+    '  await sleep(400);',
+    '  const top = read();',
+    '  if (top.length > best.length) best = top;',
+    '  return best;',
+    '})()',
+  ].join('\n');
+  try {
+    return await wc.executeJavaScript(SCROLL_AND_READ);
+  } catch {
+    try {
+      return await wc.executeJavaScript('(document.body && document.body.innerText) || ""');
+    } catch {
+      return '';
+    }
+  }
 }
 
 ipcMain.handle('share:fetch', async (_e, url) => {
   if (!SHARE_RE.test(url || '')) return { ok: false, error: 'unsupported url' };
-  const w = new BrowserWindow({ show: false, webPreferences: { javascript: true } });
+  const w = new BrowserWindow({ show: false, width: 1200, height: 1600, webPreferences: { javascript: true } });
   try {
     await w.loadURL(url, { userAgent: SHARE_UA });
     const text = await extractRenderedText(w.webContents);
     if (/just a moment|verifying you are human/i.test(text)) {
       return { ok: false, error: 'blocked by Cloudflare — copy the conversation text instead' };
     }
-    return { ok: true, text: (text || '').slice(0, 100000) };
+    return { ok: true, text: (text || '').slice(0, 200000) };
   } catch (e) {
     return { ok: false, error: String((e && e.message) || e) };
   } finally {
