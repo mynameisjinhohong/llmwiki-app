@@ -169,34 +169,52 @@ async function extractRenderedText(wc) {
     if (t && t.length > 200 && !/just a moment|verifying you are human|enable javascript/i.test(t)) break;
     await new Promise((r) => setTimeout(r, 1000));
   }
-  // Scroll to the bottom so lazily-rendered / virtualized messages actually mount,
-  // repeating until the page height stops growing; keep the longest snapshot seen.
-  // The hidden window otherwise never scrolls, so only messages above the fold get
-  // captured — that's why long conversations came back only partially.
-  const SCROLL_AND_READ = [
-    '(async () => {',
-    '  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));',
-    '  const el = document.scrollingElement || document.documentElement;',
-    "  const read = () => (document.body && document.body.innerText) || '';",
-    '  let best = read();',
-    '  let prevH = -1, same = 0;',
-    '  for (let i = 0; i < 80; i++) {',
-    '    el.scrollTop = el.scrollHeight;',
-    '    await sleep(400);',
-    '    const cur = read();',
-    '    if (cur.length > best.length) best = cur;',
-    '    const h = el.scrollHeight;',
-    '    if (h === prevH) { if (++same >= 3) break; } else { same = 0; prevH = h; }',
-    '  }',
-    '  el.scrollTop = 0;',
-    '  await sleep(400);',
-    '  const top = read();',
-    '  if (top.length > best.length) best = top;',
-    '  return best;',
-    '})()',
-  ].join('\n');
+  // Extract ONLY the conversation, scrolling the real (often INNER) scroll container so
+  // lazily-rendered / virtualized messages mount. ChatGPT turns carry
+  // [data-message-author-role]; otherwise fall back to <main>/<article> with the app chrome
+  // (nav / sidebar / login CTA) stripped — whole-body innerText pulled all of that in, and
+  // scrolling only the document left inner-scrolled messages unmounted (partial capture).
+  const EXTRACT = `(async () => {
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    const scrollers = () => {
+      const out = [];
+      document.querySelectorAll('*').forEach((el) => {
+        const oy = getComputedStyle(el).overflowY;
+        if ((oy === 'auto' || oy === 'scroll') && el.scrollHeight > el.clientHeight + 100) out.push(el);
+      });
+      if (document.scrollingElement) out.push(document.scrollingElement);
+      return out;
+    };
+    const extract = () => {
+      const turns = Array.from(document.querySelectorAll('[data-message-author-role]'));
+      if (turns.length) {
+        return turns.map((el) => {
+          const role = el.getAttribute('data-message-author-role');
+          return (role ? role.toUpperCase() + ':\\n' : '') + (el.innerText || '').trim();
+        }).join('\\n\\n').trim();
+      }
+      const root = document.querySelector('main') || document.querySelector('article') || document.body;
+      const clone = root.cloneNode(true);
+      clone.querySelectorAll('nav, aside, header, footer, script, style, button, [role=navigation]').forEach((n) => n.remove());
+      return (clone.innerText || '').trim();
+    };
+    let best = extract();
+    let same = 0;
+    for (let i = 0; i < 80; i++) {
+      scrollers().forEach((el) => { el.scrollTop = el.scrollHeight; });
+      await sleep(400);
+      const cur = extract();
+      if (cur.length > best.length) { best = cur; same = 0; } else { same++; }
+      if (same >= 4) break;
+    }
+    scrollers().forEach((el) => { el.scrollTop = 0; });
+    await sleep(400);
+    const top = extract();
+    if (top.length > best.length) best = top;
+    return best;
+  })()`;
   try {
-    return await wc.executeJavaScript(SCROLL_AND_READ);
+    return await wc.executeJavaScript(EXTRACT);
   } catch {
     try {
       return await wc.executeJavaScript('(document.body && document.body.innerText) || ""');
