@@ -1,6 +1,6 @@
 {
   "name": "llmwiki-desktop",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "private": true,
   "description": "Windows build context for the LLMWiki desktop app (built in CI; see .github/workflows/desktop-windows.yml).",
   "main": "main.js",

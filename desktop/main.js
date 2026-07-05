@@ -169,49 +169,61 @@ async function extractRenderedText(wc) {
     if (t && t.length > 200 && !/just a moment|verifying you are human|enable javascript/i.test(t)) break;
     await new Promise((r) => setTimeout(r, 1000));
   }
-  // Extract ONLY the conversation, scrolling the real (often INNER) scroll container so
-  // lazily-rendered / virtualized messages mount. ChatGPT turns carry
-  // [data-message-author-role]; otherwise fall back to <main>/<article> with the app chrome
-  // (nav / sidebar / login CTA) stripped — whole-body innerText pulled all of that in, and
-  // scrolling only the document left inner-scrolled messages unmounted (partial capture).
+  // Virtualized chat lists UNMOUNT off-screen (top) messages as you scroll down, so no
+  // single snapshot has the whole conversation — reading once at the bottom only yielded
+  // the last few messages. Instead scroll the inner container top→bottom in small steps and
+  // ACCUMULATE messages as they mount, de-duplicated, preserving order. ChatGPT turns carry
+  // [data-message-author-role] (chrome-free); otherwise fall back to <main>/<article> lines
+  // with nav/sidebar/header/buttons stripped.
   const EXTRACT = `(async () => {
     const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-    const scrollers = () => {
-      const out = [];
+    const pickScroller = () => {
+      let best = document.scrollingElement || document.documentElement;
+      let bestH = best ? best.scrollHeight : 0;
       document.querySelectorAll('*').forEach((el) => {
         const oy = getComputedStyle(el).overflowY;
-        if ((oy === 'auto' || oy === 'scroll') && el.scrollHeight > el.clientHeight + 100) out.push(el);
+        if ((oy === 'auto' || oy === 'scroll') && el.scrollHeight > el.clientHeight + 100 && el.scrollHeight > bestH) {
+          best = el; bestH = el.scrollHeight;
+        }
       });
-      if (document.scrollingElement) out.push(document.scrollingElement);
-      return out;
+      return best;
     };
-    const extract = () => {
-      const turns = Array.from(document.querySelectorAll('[data-message-author-role]'));
-      if (turns.length) {
-        return turns.map((el) => {
-          const role = el.getAttribute('data-message-author-role');
-          return (role ? role.toUpperCase() + ':\\n' : '') + (el.innerText || '').trim();
-        }).join('\\n\\n').trim();
-      }
+    const seen = new Map();
+    const collectTurns = () => {
+      let found = false;
+      document.querySelectorAll('[data-message-author-role]').forEach((el) => {
+        const role = el.getAttribute('data-message-author-role') || '';
+        const text = (el.innerText || '').trim();
+        if (!text) return;
+        found = true;
+        const key = 'T::' + role + '::' + text;
+        if (!seen.has(key)) seen.set(key, (role ? role.toUpperCase() + ':\\n' : '') + text);
+      });
+      return found;
+    };
+    const collectLines = () => {
       const root = document.querySelector('main') || document.querySelector('article') || document.body;
       const clone = root.cloneNode(true);
       clone.querySelectorAll('nav, aside, header, footer, script, style, button, [role=navigation]').forEach((n) => n.remove());
-      return (clone.innerText || '').trim();
+      (clone.innerText || '').split('\\n').forEach((ln) => {
+        const s = ln.trim();
+        if (s && !seen.has('L::' + s)) seen.set('L::' + s, s);
+      });
     };
-    let best = extract();
-    let same = 0;
-    for (let i = 0; i < 80; i++) {
-      scrollers().forEach((el) => { el.scrollTop = el.scrollHeight; });
-      await sleep(400);
-      const cur = extract();
-      if (cur.length > best.length) { best = cur; same = 0; } else { same++; }
-      if (same >= 4) break;
+    const useTurns = document.querySelectorAll('[data-message-author-role]').length > 0;
+    const scroller = pickScroller();
+    const step = Math.max(250, Math.floor((scroller.clientHeight || 600) * 0.7));
+    scroller.scrollTop = 0;
+    await sleep(350);
+    for (let guard = 0; guard < 800; guard++) {
+      if (useTurns) collectTurns(); else collectLines();
+      if (scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 5) break;
+      scroller.scrollTop = Math.min(scroller.scrollTop + step, scroller.scrollHeight);
+      await sleep(300);
     }
-    scrollers().forEach((el) => { el.scrollTop = 0; });
-    await sleep(400);
-    const top = extract();
-    if (top.length > best.length) best = top;
-    return best;
+    await sleep(350);
+    if (useTurns) collectTurns(); else collectLines();
+    return [...seen.values()].join(useTurns ? '\\n\\n' : '\\n');
   })()`;
   try {
     return await wc.executeJavaScript(EXTRACT);
