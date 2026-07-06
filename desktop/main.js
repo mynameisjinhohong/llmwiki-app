@@ -190,14 +190,24 @@ async function extractRenderedText(wc) {
     };
     const seen = new Map();
     const collectTurns = () => {
+      let els = document.querySelectorAll('[data-message-author-role]'); // ChatGPT DOM (fallback)
+      let claude = false;
+      if (!els.length) { els = document.querySelectorAll('[data-testid=user-message], [data-is-streaming]'); claude = true; } // Claude
       let found = false;
-      document.querySelectorAll('[data-message-author-role]').forEach((el) => {
-        const role = el.getAttribute('data-message-author-role') || '';
-        const text = (el.innerText || '').trim();
+      els.forEach((el) => {
+        let label, node = el;
+        if (claude) {
+          if (el.getAttribute('data-testid') === 'user-message') label = 'Human:\\n';
+          else { label = 'Claude:\\n'; node = el.querySelector('.font-claude-response') || el; } // skip the sr-only "Claude 응답:" heading
+        } else {
+          const r = el.getAttribute('data-message-author-role') || '';
+          label = r === 'user' ? 'User:\\n' : r === 'assistant' ? 'ChatGPT:\\n' : (r ? r.toUpperCase() + ':\\n' : '');
+        }
+        const text = (node.innerText || '').trim();
         if (!text) return;
         found = true;
-        const key = 'T::' + role + '::' + text;
-        if (!seen.has(key)) seen.set(key, (role ? role.toUpperCase() + ':\\n' : '') + text);
+        const key = 'T::' + label + text;
+        if (!seen.has(key)) seen.set(key, label + text);
       });
       return found;
     };
@@ -210,7 +220,7 @@ async function extractRenderedText(wc) {
         if (s && !seen.has('L::' + s)) seen.set('L::' + s, s);
       });
     };
-    const useTurns = document.querySelectorAll('[data-message-author-role]').length > 0;
+    const useTurns = document.querySelectorAll('[data-message-author-role], [data-testid=user-message], [data-is-streaming]').length > 0;
     const scroller = pickScroller();
     const step = Math.max(250, Math.floor((scroller.clientHeight || 600) * 0.7));
     scroller.scrollTop = 0;
@@ -223,7 +233,7 @@ async function extractRenderedText(wc) {
     }
     await sleep(350);
     if (useTurns) collectTurns(); else collectLines();
-    return [...seen.values()].join(useTurns ? '\\n\\n' : '\\n');
+    return [...seen.values()].join(useTurns ? '\\n\\n---\\n\\n' : '\\n');
   })()`;
   try {
     return await wc.executeJavaScript(EXTRACT);
