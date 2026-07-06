@@ -603,8 +603,19 @@ async function pollTick() {
   if (!repo) return;
   const f = await git(['-C', repo, 'fetch', 'origin', branch]);
   if (!f.ok) return;
-  const trig = await git(['-C', repo, 'cat-file', '-e', `origin/${branch}:.llmwiki/ingest-request.json`]);
-  if (!trig.ok) return; // no pending trigger
+  // Serve only THIS member's trigger (author-tagged) + the legacy untagged one. Another
+  // member's request must wait for their own host — author-partitioned compute.
+  const trigPaths = ['.llmwiki/ingest-request.json'];
+  if (cfg.author) trigPaths.unshift(`.llmwiki/ingest-request-${cfg.author}.json`);
+  let pending = false;
+  for (const p of trigPaths) {
+    const trig = await git(['-C', repo, 'cat-file', '-e', `origin/${branch}:${p}`]);
+    if (trig.ok) {
+      pending = true;
+      break;
+    }
+  }
+  if (!pending) return; // no trigger addressed to this host
   // agent.mjs --ingest pulls, ingests, removes the trigger, and pushes.
   await runAgent('ingest', undefined);
 }

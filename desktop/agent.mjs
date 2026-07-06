@@ -185,14 +185,26 @@ async function runCli(runnerName, prompt) {
   });
 }
 
+/**
+ * Trigger files this host serves: its own author-tagged one (mobile writes
+ * .llmwiki/ingest-request-<login>.json so each member's request is handled by THEIR
+ * host only) plus the legacy untagged path. Never another member's tagged trigger.
+ */
+function triggerPaths() {
+  const own = cfg.author ? cfg.triggerPath.replace(/\.json$/, `-${cfg.author}.json`) : null;
+  return own ? [own, cfg.triggerPath] : [cfg.triggerPath];
+}
+
 async function triggerPresent() {
   const f = await git(['fetch', 'origin', cfg.branch]);
   if (!f.ok) {
     console.error('fetch failed:', f.stderr);
     return false;
   }
-  const t = await git(['cat-file', '-e', `origin/${cfg.branch}:${cfg.triggerPath}`]);
-  if (t.ok) return true;
+  for (const tp of triggerPaths()) {
+    const t = await git(['cat-file', '-e', `origin/${cfg.branch}:${tp}`]);
+    if (t.ok) return true;
+  }
   if (cfg.auto) {
     const ls = await git(['ls-tree', '--name-only', `origin/${cfg.branch}`, 'inbox/']);
     return ls.stdout.split('\n').some((p) => /^inbox\/[^/]+\.md$/.test(p));
@@ -289,8 +301,11 @@ async function applyOp(kind) {
     restoreForeignInbox(stashed); // back to inbox/ before git add → not part of this commit
   }
   console.log(`  cli(${cfg.runner}): ${cli.ok ? 'ok' : 'exit ' + cli.code}`);
-  if (kind === 'ingest' && existsSync(join(cfg.repoPath, cfg.triggerPath))) {
-    await git(['rm', '-f', '--', cfg.triggerPath]);
+  if (kind === 'ingest') {
+    // Clear only the triggers addressed to this host (own author-tagged + legacy).
+    for (const tp of triggerPaths()) {
+      if (existsSync(join(cfg.repoPath, tp))) await git(['rm', '-f', '--', tp]);
+    }
   }
   await git(['add', '-A']);
   const status = await git(['status', '--porcelain']);
