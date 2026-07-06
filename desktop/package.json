@@ -1,8 +1,8 @@
 {
   "name": "llmwiki-desktop",
-  "version": "0.1.4",
+  "version": "0.1.0",
   "private": true,
-  "description": "Windows build context for the LLMWiki desktop app (built in CI; see .github/workflows/desktop-windows.yml).",
+  "description": "Windows/macOS build context for the LLMWiki desktop app (built in CI; see .github/workflows/desktop-windows.yml). NOTE: this version is a placeholder — CI overwrites it with 0.1.<github.run_number> at build time, so the published/installed version won't match this number.",
   "main": "main.js",
   "scripts": {
     "dist": "electron-builder --win"
