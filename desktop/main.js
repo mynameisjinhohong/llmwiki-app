@@ -125,6 +125,15 @@ function runAgent(op, lang) {
 ipcMain.handle('agent:run', (_e, arg) => {
   const op = typeof arg === 'string' ? arg : arg?.op;
   const lang = arg && typeof arg === 'object' ? arg.lang : undefined;
+  // "Ingest host" off must gate MANUAL CLI runs too, not just the trigger poller —
+  // the panel buttons used to bypass the toggle entirely.
+  if (readAgentConfig().ingestHost === false) {
+    return {
+      ok: false,
+      output:
+        'Ingest host is OFF for this desktop (Settings). Turn it on to run CLI ingest/lint, or use "API ingest" (LLM key, no CLI).',
+    };
+  }
   return runAgent(op, lang);
 });
 
