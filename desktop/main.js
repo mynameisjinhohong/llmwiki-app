@@ -236,11 +236,99 @@ async function extractRenderedText(wc) {
   }
 }
 
+// ChatGPT share pages don't expose [data-message-author-role] and virtualize the DOM, but
+// they SSR the entire conversation as a React Router turbo-stream in the page HTML: one flat
+// array where every number is an index into it, objects use "_<keyIndex>": valueIndex. Decode
+// it directly → the full conversation, in order, with no scrolling and no app chrome.
+function extractChatGptShare(html) {
+  let payload = '';
+  let i = 0;
+  const NEEDLE = 'streamController.enqueue(';
+  while ((i = html.indexOf(NEEDLE, i)) >= 0) {
+    let j = i + NEEDLE.length;
+    if (html[j] !== '"') { i = j + 1; continue; }
+    let k = j + 1, out = '';
+    while (k < html.length) {
+      const c = html[k];
+      if (c === '\\') { out += html[k] + html[k + 1]; k += 2; continue; }
+      if (c === '"') break;
+      out += c; k++;
+    }
+    try { payload += JSON.parse('"' + out + '"'); } catch { /* skip a bad chunk */ }
+    i = k + 1;
+  }
+  if (!payload) return '';
+  let A;
+  try { A = JSON.parse(payload.split('\n')[0]); } catch { return ''; }
+  if (!Array.isArray(A)) return '';
+  const memo = new Map();
+  const resolve = (idx, depth) => {
+    if (typeof idx !== 'number') return idx;
+    if (idx < 0 || depth > 20) return null; // negative = sentinel
+    if (memo.has(idx)) return memo.get(idx);
+    const v = A[idx];
+    let r;
+    if (Array.isArray(v)) r = v.map((x) => resolve(x, depth + 1));
+    else if (v && typeof v === 'object') {
+      r = {};
+      for (const k in v) r[A[Number(k.slice(1))]] = resolve(v[k], depth + 1);
+    } else r = v;
+    memo.set(idx, r);
+    return r;
+  };
+  const lc = A.indexOf('linear_conversation');
+  if (lc < 0) return '';
+  const nodes = A[lc + 1];
+  if (!Array.isArray(nodes)) return '';
+  const partText = (p) =>
+    typeof p === 'string' ? p : p && typeof p === 'object' && typeof p.text === 'string' ? p.text : '';
+  const out = [];
+  for (const n of nodes) {
+    const node = resolve(n, 0);
+    const m = node && node.message;
+    if (!m || !m.author || !m.content) continue;
+    const role = m.author.role;
+    if (role !== 'user' && role !== 'assistant') continue;
+    if (m.metadata && m.metadata.is_visually_hidden_from_conversation) continue;
+    const parts = Array.isArray(m.content.parts) ? m.content.parts : [];
+    const text = parts.map(partText).join('').trim();
+    if (!text) continue;
+    out.push((role === 'user' ? 'User:\n' : 'ChatGPT:\n') + text);
+  }
+  return out.join('\n\n---\n\n');
+}
+
 ipcMain.handle('share:fetch', async (_e, url) => {
   if (!SHARE_RE.test(url || '')) return { ok: false, error: 'unsupported url' };
+  const isChatGpt = /^https:\/\/chatgpt\.com\/share\//.test(url);
+
+  // ChatGPT fast path: fetch the SSR HTML and decode the embedded conversation directly —
+  // no browser, no scrolling, no chrome. A browser UA gets past Cloudflare for a plain GET.
+  if (isChatGpt) {
+    try {
+      const res = await fetch(url, { headers: { 'User-Agent': SHARE_UA } });
+      if (res.ok) {
+        const text = extractChatGptShare(await res.text());
+        if (text) return { ok: true, text: text.slice(0, 200000) };
+      }
+    } catch {
+      /* fall through to the browser path */
+    }
+  }
+
   const w = new BrowserWindow({ show: false, width: 1200, height: 1600, webPreferences: { javascript: true } });
   try {
     await w.loadURL(url, { userAgent: SHARE_UA });
+    // ChatGPT again, in case the direct fetch was blocked: decode from the loaded page's HTML.
+    if (isChatGpt) {
+      try {
+        const html = await w.webContents.executeJavaScript('document.documentElement.outerHTML');
+        const text = extractChatGptShare(html || '');
+        if (text) return { ok: true, text: text.slice(0, 200000) };
+      } catch {
+        /* fall through to DOM extraction */
+      }
+    }
     const text = await extractRenderedText(w.webContents);
     if (/just a moment|verifying you are human/i.test(text)) {
       return { ok: false, error: 'blocked by Cloudflare — copy the conversation text instead' };
