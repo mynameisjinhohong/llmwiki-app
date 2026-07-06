@@ -117,9 +117,26 @@ function git(args) {
   });
 }
 
-function runCli(runnerName, prompt) {
+/** True if the runner's executable is reachable (PATH lookup, or an explicit path). */
+function cliAvailable(cmd) {
+  return new Promise((resolve) => {
+    if (cmd.includes('/') || cmd.includes('\\')) return resolve(existsSync(cmd));
+    execFile(process.platform === 'win32' ? 'where' : 'which', [cmd], (err) => resolve(!err));
+  });
+}
+
+async function runCli(runnerName, prompt) {
   const r = cfg.runners[runnerName];
-  if (!r) return Promise.resolve({ ok: false, output: `unknown runner: ${runnerName}` });
+  if (!r) return { ok: false, output: `unknown runner: ${runnerName}` };
+  // Pre-check the CLI exists. With shell:true (Windows) a missing command doesn't ENOENT —
+  // cmd.exe prints a localized (CP949 → mojibake) "not recognized" error and exits 1, so the
+  // friendly guidance below would never trigger without this explicit check.
+  if (!(await cliAvailable(r.cmd))) {
+    return {
+      ok: false,
+      output: `'${r.cmd}' not found on PATH. Install it (e.g. Claude Code) and restart, or use "API ingest" in the app (needs an LLM key — no CLI required).`,
+    };
+  }
   // Windows: the runner is usually a `.cmd` shim that Node can only launch via shell:true —
   // which would mangle the multi-line prompt passed as an arg. So on Windows we drop the
   // {PROMPT} arg and feed the prompt through stdin instead. macOS/Linux keep the arg path.
@@ -127,15 +144,24 @@ function runCli(runnerName, prompt) {
   const args = win
     ? r.args.filter((a) => a !== '{PROMPT}')
     : r.args.map((a) => a.replace('{PROMPT}', prompt));
+  // With shell:true, pass ONE command string (quoting args) — an args array is only
+  // concatenated anyway and Node warns (DEP0190).
+  const winQuote = (a) => (/[\s"^&|<>()%!]/.test(a) ? `"${a.replace(/"/g, '""')}"` : a);
   return new Promise((resolve) => {
     let out = '';
     let errOut = '';
-    const child = spawn(r.cmd, args, {
-      cwd: cfg.repoPath,
-      env: process.env,
-      shell: win,
-      stdio: [win ? 'pipe' : 'ignore', 'pipe', 'pipe'],
-    });
+    const child = win
+      ? spawn([r.cmd, ...args].map(winQuote).join(' '), {
+          cwd: cfg.repoPath,
+          env: process.env,
+          shell: true,
+          stdio: ['pipe', 'pipe', 'pipe'],
+        })
+      : spawn(r.cmd, args, {
+          cwd: cfg.repoPath,
+          env: process.env,
+          stdio: ['ignore', 'pipe', 'pipe'],
+        });
     if (win && child.stdin) {
       try {
         child.stdin.write(prompt);
