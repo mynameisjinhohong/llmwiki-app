@@ -74,6 +74,7 @@ const INGEST_PROMPT = [
   //  captures are moved out of inbox/ so the runner never reads them. No LLM-side filter needed.)
   '- Image captures: an inbox note with an ![](media/...) reference points to a binary in inbox/media/.',
   '  Move that binary to sources/media/, OCR/caption it, and embed it in the relevant page.',
+  '- LINKS: if a capture contains a URL whose page content is NOT already included below it (look for a "🔗" section), FETCH the URL and synthesize from the ACTUAL page content; cite the URL in the 출처 section. If fetching fails, note that in the page — do NOT invent the content from memory.',
   '- Update wiki/index.md and append a dated block to wiki/log.md.',
   '- Move each processed inbox item to inbox/archive/YYYY-MM/.',
   '- Redact any secrets per the schema HARD RULES.',

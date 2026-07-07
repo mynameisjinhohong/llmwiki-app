@@ -360,6 +360,27 @@ ipcMain.handle('share:fetch', async (_e, url) => {
   }
 });
 
+// General page fetch for capture-time link enrichment — the renderer can't fetch
+// arbitrary origins (CORS), the main process can. HTML/text only; renderer extracts text.
+ipcMain.handle('page:fetch', async (_e, url) => {
+  if (!/^https?:\/\//.test(url || '')) return { ok: false, error: 'bad url' };
+  try {
+    const res = await fetch(url, {
+      headers: { 'User-Agent': SHARE_UA },
+      redirect: 'follow',
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!res.ok) return { ok: false, error: `HTTP ${res.status}` };
+    const ct = res.headers.get('content-type') || '';
+    if (!/text\/html|text\/plain|application\/xhtml/.test(ct)) {
+      return { ok: false, error: `unsupported type: ${ct}` };
+    }
+    return { ok: true, html: (await res.text()).slice(0, 800000) };
+  } catch (e) {
+    return { ok: false, error: String((e && e.message) || e) };
+  }
+});
+
 // OAuth device flow proxy — github.com's OAuth endpoints send no CORS headers, so the
 // renderer can't call them directly; the main process (Node, no CORS) does the POST.
 ipcMain.handle('oauth:fetch', async (_e, url, body) => {

@@ -11,6 +11,7 @@ contextBridge.exposeInMainWorld('llmwiki', {
   agentQuery: (question, lang) => ipcRenderer.invoke('agent:query', { question, lang }),
   onQuickCapture: (cb) => ipcRenderer.on('quick-capture', () => cb()),
   fetchShare: (url) => ipcRenderer.invoke('share:fetch', url),
+  fetchPage: (url) => ipcRenderer.invoke('page:fetch', url),
   getPairBaseUrl: () => ipcRenderer.invoke('pair:baseUrl'),
   getAutoLaunch: () => ipcRenderer.invoke('autolaunch:get'),
   setAutoLaunch: (enabled) => ipcRenderer.invoke('autolaunch:set', enabled),
