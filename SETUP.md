@@ -51,26 +51,53 @@ Several people share one wiki (serverless — you're just GitHub collaborators o
 
 Everyone connects with their own account/device, and the results merge into **one integrated wiki**.
 
+> The phone's **"Ask desktop to ingest"** is served by **the desktop signed into YOUR account** (with ingest host on) — another member's desktop won't take your request.
+
 ---
 
 ## 4. Writing: capture → ingest
 
 1. **Capture** — save notes/links/photos in the Capture tab; they land in `inbox` (raw).
+   - **Link captures**: save a URL and the app **fetches the page body into the capture** (up to 2 links, as a `🔗 title — URL` section) — so ingest works from the **actual content**, not the bare link. In a plain web browser this is skipped (CORS); CLI ingest then fetches the link at ingest time instead.
+   - **Save a ChatGPT/Claude chat** (desktop): Capture screen → **"🔗 Import a ChatGPT / Claude chat"** → paste the share link → the full conversation lands in the note.
+   - Mis-captured something? Open it in the Inbox and **"🗑 Remove this capture"** (your own captures only).
 2. **Ingest** — turn the inbox into well-synthesized wiki pages. Two ways:
    - **🟢 "API ingest" (easy, no CLI)** — put a **free Gemini key** in Settings → Search LLM, then tap **"API ingest"**. Get a key at https://aistudio.google.com/apikey (no card).
-   - **⚙️ CLI ingest (higher quality)** — install **Claude Code** on the desktop + `claude` login, then tap **"Ingest (claude)"**. Handles PDFs etc. well, but needs the install + login.
+   - **⚙️ CLI ingest (higher quality)** — install **Claude Code** on the desktop + `claude` login, then tap **"Ingest (claude)"**. Handles PDFs etc. well, but needs the install + login. When Settings → **"Use this desktop as ingest host"** is off, CLI ingest/lint are disabled on that desktop.
    - (Group) each host ingests **only its own captures** → both sides land in the shared wiki.
+   - After ingest the **search index (embeddings) refreshes automatically**; manual: **"🔎 Rebuild search index"** on the ingest screen.
 
 ---
 
-## 5. Troubleshooting
+## 5. Search · recommend · conflicting info
+
+**🔎 Semantic search** — once the wiki grows past ~20 pages, questions are answered via **embedding search** over page content.
+- Your LLM key must support embeddings: **free Gemini ✅ · OpenAI ✅ · OpenRouter ✖** (unsupported keys fall back to the catalog search automatically — the answer shows which mode was used).
+- The index refreshes after each ingest; rebuild manually with **"🔎 Rebuild search index"**.
+
+**👍 Recommend** — recommend a page in Browse (one vote per member) and it gets a ranking boost, together with backlink count and edit recency.
+
+**⚠️ Conflicting info (groups)** — when members capture contradictory claims:
+1. Ingest **keeps BOTH claims**, marks the page with a ⚠️ block, and opens a vote.
+2. The Browse tab shows a **"⚠️ Conflicts to vote · N"** badge → tap to jump to each page → vote on the card. After voting the card folds; tap it again to **change your vote**.
+3. After the deadline (default **7 days**; set `"conflictVotingDays": N` in the wiki's root `.llmwiki.json`) the **next ingest/reindex resolves it** by majority — **no votes / tie → the LLM decides**. The losing claim is kept as history (non-destructive).
+
+> The `.llmwiki/` folder (`embeddings.json` · `stats.json` · `conflicts.json`) is app-managed **derived data** — don't hand-edit it (it regenerates if deleted).
+
+---
+
+## 6. Troubleshooting
 
 - **Signed in, but a repo you own (esp. a new group wiki) isn't listed**
   → An old, narrowly-scoped token may still be active. In the Wiki tab, **re-link via "Sign in with GitHub"** and all your repos will show.
 - **"Not an LLMWiki" / manual add is blocked**
   → It's a plain repo you made on github.com. Use **"Create a new wiki"**, or pick a repo that carries the wiki marker.
-- **`spawn claude ENOENT` on ingest** (desktop)
+- **`'claude' not found on PATH` on ingest** (desktop)
   → Claude Code isn't installed on this PC. Use **"API ingest"** (free LLM key), or install Claude Code.
+- **Ingest (claude) / Lint buttons disabled** ("Ingest host is off…")
+  → Turn on Settings → **"Use this desktop as ingest host"**, or use **"API ingest"**. (Keeping it off on secondary desktops is normal.)
+- **The phone's "Ask desktop to ingest" times out**
+  → A desktop signed into **your account** must be open with ingest host on. Otherwise use "Process on this device (API)" on the phone.
 - **A group wiki doesn't appear in the picker**
   → Check that you (1) **accepted the invitation** on GitHub and (2) signed into the app with **the exact invited account**. Still missing? In the Wiki tab use **Advanced: connect manually** with owner = admin's username, repo = wiki name (leave the token blank if you're signed in).
 - **"Invalid token (401)" / "Repo not found (404)"** (manual connect)

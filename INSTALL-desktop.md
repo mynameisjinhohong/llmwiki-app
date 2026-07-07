@@ -57,3 +57,5 @@ Windows·macOS 설치 파일은 GitHub Actions에서 각각 Windows·macOS 러�
 3. 완료되면 `desktop-latest` 릴리스의 `LLMWiki-Setup.exe`(Windows) + `LLMWiki.dmg`(macOS)가 갱신됩니다(위 다운로드 링크는 항상 최신).
 
 > **무료 배포를 위해 미서명으로** 빌드하므로 최초 실행 시 OS 경고가 뜹니다(사용자는 §1대로 우회). 경고를 완전히 없애려면 유료 서명(Apple $99/년, Windows 스토어[무료·MSIX] 또는 Azure Trusted Signing[~$10/월])을 얹으면 됩니다.
+
+> 앱 버전은 CI가 **`0.1.<빌드 실행번호>`** 로 자동 부여합니다 — `desktop/package.json`의 `0.1.0`은 플레이스홀더이며 실제 배포 버전과 다릅니다.
