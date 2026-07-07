@@ -283,10 +283,25 @@ function recoverStash() {
   restoreForeignInbox(names);
 }
 
+/**
+ * Race-proof remote sync. `git pull --rebase` resolves its target from FETCH_HEAD, which
+ * the desktop app's poller clobbers when its periodic `git fetch` on the SAME clone
+ * overlaps a run ("fatal: Cannot rebase onto multiple branches"). Fetch + rebase onto the
+ * remote-tracking ref instead — ref updates are atomic, so concurrent fetches are harmless.
+ * On a genuine rebase conflict, abort so the clone stays clean for the next run.
+ */
+async function syncWithRemote() {
+  const f = await git(['fetch', 'origin', cfg.branch]);
+  if (!f.ok) return f;
+  const rb = await git(['rebase', `origin/${cfg.branch}`]);
+  if (!rb.ok) await git(['rebase', '--abort']);
+  return rb;
+}
+
 /** kind: 'ingest' | 'lint'. Pull → run CLI → (ingest: clear trigger) → commit/push. */
 async function applyOp(kind) {
   recoverStash();
-  const pull = await git(['pull', '--rebase', 'origin', cfg.branch]);
+  const pull = await syncWithRemote();
   if (!pull.ok) {
     console.error('  pull failed:', pull.stderr);
     return { ok: false, error: 'pull failed: ' + pull.stderr };
@@ -326,7 +341,7 @@ async function applyOp(kind) {
         break;
       }
       console.error(`  push failed (attempt ${attempt + 1}):`, p.stderr);
-      const rb = await git(['pull', '--rebase', 'origin', cfg.branch]);
+      const rb = await syncWithRemote();
       if (!rb.ok) {
         console.error('  rebase failed:', rb.stderr);
         break;
