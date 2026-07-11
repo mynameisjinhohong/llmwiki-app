@@ -80,7 +80,7 @@ Everyone connects with their own account/device, and the results merge into **on
 **⚠️ Conflicting info (groups)** — when members capture contradictory claims:
 1. Ingest **keeps BOTH claims**, marks the page with a ⚠️ block, and opens a vote.
 2. The Browse tab shows a **"⚠️ Conflicts to vote · N"** badge → tap to jump to each page → vote on the card. After voting the card folds; tap it again to **change your vote**.
-3. **At the deadline voting locks**, and the result is NOT applied by itself — press **"✅ Apply the vote result"** on the closed conflict card, or it resolves when anyone runs the **next ingest/reindex**. Majority wins; **no votes / tie → the LLM decides**. The losing claim is kept as history (non-destructive). Default window is **7 days** (`"conflictVotingDays": N` in the wiki's root `.llmwiki.json`).
+3. **At the deadline voting locks**, and the result is NOT applied by itself — press **"✅ Apply the vote result"** on the closed conflict card, or it resolves when anyone runs the **next ingest/reindex**. Majority wins; **no votes / tie → the LLM decides**. On resolution the **page simply states the accepted fact** (no residual note); the vote outcome and the rejected claim are preserved in `wiki/log.md` and git history (non-destructive). Default window is **7 days** (`"conflictVotingDays": N` in the wiki's root `.llmwiki.json`).
 
 > The `.llmwiki/` folder (`embeddings.json` · `stats.json` · `conflicts.json`) is app-managed **derived data** — don't hand-edit it (it regenerates if deleted).
 
