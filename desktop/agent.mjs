@@ -70,6 +70,7 @@ const LANG_LINE = `Write your final summary/report to the user in ${LANG_NAMES[R
 const INGEST_PROMPT = [
   'Process my inbox and ingest it into the wiki, following docs/wiki-schema.md EXACTLY (read it first).',
   '- Turn each top-level item in inbox/ (*.md) into well-synthesized, interlinked wiki pages under wiki/.',
+  '- FACTS ONLY: never invent details the captures do not state. In particular, do NOT turn mere list order/position into numbers, ranks, or IDs (e.g. a capture listing member names does NOT make someone "member #2"). When a detail is not stated, leave it out.',
   // (Multi-host author filtering happens in the wrapper BEFORE the CLI runs — other authors'
   //  captures are moved out of inbox/ so the runner never reads them. No LLM-side filter needed.)
   '- Image captures: an inbox note with an ![](media/...) reference points to a binary in inbox/media/.',
