@@ -71,6 +71,7 @@ const INGEST_PROMPT = [
   'Process my inbox and ingest it into the wiki, following docs/wiki-schema.md EXACTLY (read it first).',
   '- Turn each top-level item in inbox/ (*.md) into well-synthesized, interlinked wiki pages under wiki/.',
   '- FACTS ONLY: never invent details the captures do not state. In particular, do NOT turn mere list order/position into numbers, ranks, or IDs (e.g. a capture listing member names does NOT make someone "member #2"). When a detail is not stated, leave it out.',
+  '- SCOPE: process ONLY the *.md files directly in inbox/. NEVER read, process, move, or delete anything under .git/ or any "stash" directory (e.g. .llmwiki-stash/) — those hold OTHER members\' captures awaiting their own host.',
   // (Multi-host author filtering happens in the wrapper BEFORE the CLI runs — other authors'
   //  captures are moved out of inbox/ so the runner never reads them. No LLM-side filter needed.)
   '- Image captures: an inbox note with an ![](media/...) reference points to a binary in inbox/media/.',
@@ -237,7 +238,11 @@ function parseAuthor(content) {
 // never even reads other members' captures (no wasted tokens). Foreign captures are moved to a
 // stash dir and restored verbatim afterwards (before git add), so they stay in inbox/ for their
 // own host. Untagged captures and our own are left in place.
-const STASH_DIR = join(cfg.repoPath, '.llmwiki-stash');
+// The stash lives INSIDE .git/ — an agentic CLI explores the working tree and once found a
+// stash at the repo root and "helpfully" processed another member's capture; nothing browses
+// .git/, so this is a structural guarantee, not a prompt plea.
+const STASH_DIR = join(cfg.repoPath, '.git', 'llmwiki-stash');
+const LEGACY_STASH_DIR = join(cfg.repoPath, '.llmwiki-stash'); // pre-.git location (recovery only)
 function stashForeignInbox() {
   if (!cfg.author) return null; // no identity → process everything (solo)
   let names;
@@ -284,15 +289,29 @@ function restoreForeignInbox(moved) {
     /* ignore */
   }
 }
-// Recover any stash a previous crash left behind, so captures are never stuck out of inbox/.
+// Recover any stash a previous crash left behind (new AND legacy locations), so captures
+// are never stuck out of inbox/.
 function recoverStash() {
-  let names;
-  try {
-    names = readdirSync(STASH_DIR).filter((n) => /\.md$/.test(n));
-  } catch {
-    return;
+  for (const dir of [STASH_DIR, LEGACY_STASH_DIR]) {
+    let names;
+    try {
+      names = readdirSync(dir).filter((n) => /\.md$/.test(n));
+    } catch {
+      continue;
+    }
+    for (const name of names) {
+      try {
+        renameSync(join(dir, name), join(cfg.repoPath, 'inbox', name));
+      } catch {
+        /* ignore */
+      }
+    }
+    try {
+      rmSync(dir, { recursive: true, force: true });
+    } catch {
+      /* ignore */
+    }
   }
-  restoreForeignInbox(names);
 }
 
 /**
