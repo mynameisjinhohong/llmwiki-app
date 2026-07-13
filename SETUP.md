@@ -74,6 +74,7 @@ Everyone connects with their own account/device, and the results merge into **on
 **🔎 Semantic search** — once the wiki grows past ~20 pages, questions are answered via **embedding search** over page content.
 - Your LLM key must support embeddings: **free Gemini ✅ · OpenAI ✅ · OpenRouter ✖** (unsupported keys fall back to the catalog search automatically — the answer shows which mode was used).
 - The index refreshes after each ingest; rebuild manually with **"🔎 Rebuild search index"**.
+- **Search history**: your last **20** Q&As are kept **on this device only** (reopen via **🕘 History** on the Search tab; never shared with the group). Older entries are removed automatically.
 
 **👍 Recommend** — recommend a page in Browse (one vote per member) and it gets a ranking boost, together with backlink count and edit recency.
 
