@@ -665,6 +665,9 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.js'),
     },
   });
+  // Keep the window title as 'LLMWiki' — otherwise the loaded page's <title> (the Expo
+  // project name) overrides it in the OS title bar / taskbar.
+  win.on('page-title-updated', (e) => e.preventDefault());
   win.webContents.setWindowOpenHandler(({ url }) => {
     if (url.startsWith('app://')) return { action: 'allow' };
     shell.openExternal(url);
