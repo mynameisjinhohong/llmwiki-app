@@ -654,8 +654,10 @@ let win;
 
 function createWindow() {
   win = new BrowserWindow({
-    width: 440,
-    height: 860,
+    width: 1180,
+    height: 820,
+    minWidth: 680,
+    minHeight: 600,
     title: 'LLMWiki',
     webPreferences: {
       contextIsolation: true,
