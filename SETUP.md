@@ -17,8 +17,9 @@ LLMWiki uses **your own private GitHub repository** as the wiki — there's no s
 ## 1. Connect GitHub — "Sign in with GitHub" (recommended, easiest)
 
 1. In the app's **Wiki tab** (or the first-run screen), tap **"Sign in with GitHub"**.
-2. A **code** appears (e.g. `AB12-CD34`) and your browser opens → enter the code on GitHub and **Authorize**.
-3. That's it — the app connects automatically. **No token to create or copy.**
+2. A **code** appears (e.g. `AB12-CD34`) and is **copied to your clipboard automatically**.
+3. Tap **"Step 2 · Open GitHub & approve"** → the GitHub page opens → **paste** the code and **Authorize**.
+4. **Come back to the app — it connects automatically.** No token to create or copy.
 
 > Desktop and mobile sign in separately (storage is per-device). You can also sync phone↔PC via the desktop's **Settings → Pair mobile** QR.
 
